@@ -1,0 +1,19 @@
+#!/bin/bash
+set -eu
+
+mkdir $BOSH_INSTALL_TARGET/bin
+
+pushd mlock
+  make maybe
+  cp maybe $BOSH_INSTALL_TARGET/bin/canimlock
+popd
+
+# blob comes from https://releases.hashicorp.com/vault/ 
+# source comes from https://github.com/hashicorp/vault
+
+BLOB_VAULT_VERSION=1.9.3
+
+pushd vault
+  unzip vault_${BLOB_VAULT_VERSION}_linux_amd64.zip
+  cp -a vault $BOSH_INSTALL_TARGET/bin
+popd

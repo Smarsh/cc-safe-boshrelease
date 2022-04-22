@@ -1,0 +1,188 @@
+---
+meta:
+  name:    safe
+  release: Safe (Vault) BOSH Release
+  target:  pipes
+  url:     https://pipes.starkandwayne.com
+
+  initial_version: 0.0.1
+
+  git:
+    name:  Stark & Wayne CI Bot
+    email: ci@starkandwayne.com
+
+  bosh-lite:
+    target:   https://10.128.4.73:25555
+    username: ((thunder-dome.username))
+    password: ((thunder-dome.password))
+    cacert:   ((thunder-dome.ca-certificate))
+
+  aws:
+    access_key: ((cfcommunity.access))
+    secret_key: ((cfcommunity.secret))
+
+  github:
+    owner:        cloudfoundry-community
+    repo:         safe-boshrelease
+    branch:       master
+    private_key:  ((starkandwayne-bot-github.private-key))
+    access_token: ((starkandwayne-bot-github.access-token))
+
+  shout:
+    url:      http://10.128.4.65:7109
+    username: ((shout.username))
+    password: ((shout.password))
+
+groups:
+  - name: blobs
+    jobs:
+      - strongbox
+      - vault-broker
+
+jobs:
+  - name: strongbox # {{{
+    public: true
+    plan:
+    - in_parallel:
+      - { get: git }
+      - { get: strongbox, trigger: true }
+    - task: update-strongbox
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: (( grab meta.image.name ))
+            tag:        (( grab meta.image.tag ))
+        inputs:
+        - name: git
+        - name: strongbox
+        outputs:
+        - name: pushme
+        run:
+          path: ./git/ci/scripts/update-blob
+        params:
+          REPO_ROOT:        git
+          REPO_OUT:         pushme
+          BLOB_DIR:         strongbox
+          BLOB_NAME:        strongbox
+          BLOB_BINARY:      strongbox-linux-amd64
+          BLOB_CLEANUP:     strongbox/strongbox
+          BLOB_DESTINATION: strongbox/strongbox
+          AWS_ACCESS_KEY:   (( grab meta.aws.access_key ))
+          AWS_SECRET_KEY:   (( grab meta.aws.secret_key ))
+          BRANCH:           (( grab meta.github.branch ))
+      on_success:
+        put: notify
+        params:
+          topic:   (( concat meta.shout.topic "-$BUILD_JOB_NAME" ))
+          message: blob ingestion job '$BUILD_JOB_NAME' succeeded.
+          ok:      yes
+          link:    (( grab meta.shout.links.build ))
+      on_failure:
+        put: notify
+        params:
+          topic:   (( concat meta.shout.topic "-$BUILD_JOB_NAME" ))
+          message: blob ingestion job '$BUILD_JOB_NAME' failed.
+          ok:      no
+          link:    (( grab meta.shout.links.build ))
+    - put: git
+      params:
+        rebase: true
+        repository: pushme/git
+      on_success:
+        put: notify
+        params:
+          topic:   (( concat meta.shout.topic "-$BUILD_JOB_NAME" ))
+          message: blob ingestion job '$BUILD_JOB_NAME' succeeded.
+          ok:      yes
+          link:    (( grab meta.shout.links.build ))
+      on_failure:
+        put: notify
+        params:
+          topic:   (( concat meta.shout.topic "-$BUILD_JOB_NAME" ))
+          message: blob ingestion job '$BUILD_JOB_NAME' failed.
+          ok:      no
+          link:    (( grab meta.shout.links.build ))
+  # }}}
+  - name: vault-broker # {{{
+    public: true
+    plan:
+    - in_parallel:
+      - { get: git }
+      - { get: vault-broker, trigger: true }
+    - task: update-vault-broker
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: (( grab meta.image.name ))
+            tag:        (( grab meta.image.tag ))
+        inputs:
+        - name: git
+        - name: vault-broker
+        outputs:
+        - name: pushme
+        run:
+          path: ./git/ci/scripts/update-blob
+        params:
+          REPO_ROOT:        git
+          REPO_OUT:         pushme
+          BLOB_DIR:         vault-broker
+          BLOB_NAME:        vault-broker
+          BLOB_BINARY:      vault-broker-linux-amd64
+          BLOB_CLEANUP:     vault-broker/vault-broker
+          BLOB_DESTINATION: vault-broker/vault-broker
+          AWS_ACCESS_KEY:   (( grab meta.aws.access_key ))
+          AWS_SECRET_KEY:   (( grab meta.aws.secret_key ))
+          BRANCH:           (( grab meta.github.branch ))
+      on_success:
+        put: notify
+        params:
+          topic:   (( concat meta.shout.topic "-$BUILD_JOB_NAME" ))
+          message: blob ingestion job '$BUILD_JOB_NAME' succeeded.
+          ok:      yes
+          link:    (( grab meta.shout.links.build ))
+      on_failure:
+        put: notify
+        params:
+          topic:   (( concat meta.shout.topic "-$BUILD_JOB_NAME" ))
+          message: blob ingestion job '$BUILD_JOB_NAME' failed.
+          ok:      no
+          link:    (( grab meta.shout.links.build ))
+    - put: git
+      params:
+        rebase: true
+        repository: pushme/git
+      on_success:
+        put: notify
+        params:
+          topic:   (( concat meta.shout.topic "-$BUILD_JOB_NAME" ))
+          message: blob ingestion job '$BUILD_JOB_NAME' succeeded.
+          ok:      yes
+          link:    (( grab meta.shout.links.build ))
+      on_failure:
+        put: notify
+        params:
+          topic:   (( concat meta.shout.topic "-$BUILD_JOB_NAME" ))
+          message: blob ingestion job '$BUILD_JOB_NAME' failed.
+          ok:      no
+          link:    (( grab meta.shout.links.build ))
+  # }}}
+
+resources:
+  - name: strongbox # {{{
+    type: github-release
+    source:
+      user:         jhunt
+      repository:   go-strongbox
+      access_token: (( grab meta.github.access_token ))
+  # }}}
+  - name: vault-broker # {{{
+    type: github-release
+    source:
+      user:         cloudfoundry-community
+      repository:   vault-broker
+      access_token: (( grab meta.github.access_token ))
+  # }}}
